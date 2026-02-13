@@ -46,10 +46,24 @@ app.post("/upload", upload.single("file"), (req, res) => {
 
 // Socket
 io.on("connection", (socket) => {
-  socket.on("chat message", (data) => {
-    io.emit("chat message", data);
+
+  socket.on("join", (username) => {
+    socket.username = username;
+    io.emit("system message", username + " se unió al chat");
   });
+
+  socket.on("chat message", (msg) => {
+    const messageData = {
+      username: socket.username || "Anónimo",
+      message: msg,
+      time: new Date().toLocaleTimeString()
+    };
+
+    io.emit("chat message", messageData);
+  });
+
 });
+
 
 server.listen(PORT, () => {
   console.log("Servidor iniciado en puerto " + PORT);
