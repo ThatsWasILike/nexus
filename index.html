@@ -2,44 +2,119 @@
 <html>
 <head>
   <title>Nexus Chat</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #111;
+      color: white;
+    }
+
+    #messages {
+      border: 1px solid #444;
+      height: 300px;
+      overflow-y: auto;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #1a1a1a;
+    }
+
+    .message {
+      margin-bottom: 8px;
+    }
+
+    .system {
+      color: #00ffff;
+    }
+
+    .username {
+      font-weight: bold;
+      color: #4fc3f7;
+    }
+
+    .time {
+      font-size: 10px;
+      color: gray;
+      margin-left: 5px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Nexus Chat</h1>
 
-  <div id="messages"></div>
+  <h1>🔥 Nexus Chat 🔥</h1>
 
-  <input id="input" placeholder="Escribe un mensaje..." />
-  <button id="send">Enviar</button>
+  <input id="usernameInput" placeholder="Tu nombre..." />
+  <button id="joinBtn">Entrar</button>
 
-  <br><br>
+  <div id="chatArea" style="display:none;">
+    <div id="messages"></div>
 
-  <input type="file" id="fileInput">
-  <button id="sendFile">Enviar Archivo</button>
+    <input id="messageInput" placeholder="Escribe un mensaje..." />
+    <button id="sendBtn">Enviar</button>
+
+    <br><br>
+
+    <input type="file" id="fileInput">
+    <button id="sendFileBtn">Enviar Archivo</button>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
 
-    const input = document.getElementById("input");
-    const sendBtn = document.getElementById("send");
+    const usernameInput = document.getElementById("usernameInput");
+    const joinBtn = document.getElementById("joinBtn");
+    const chatArea = document.getElementById("chatArea");
     const messages = document.getElementById("messages");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const fileInput = document.getElementById("fileInput");
+    const sendFileBtn = document.getElementById("sendFileBtn");
 
-    sendBtn.onclick = () => {
-      socket.emit("chat message", input.value);
-      input.value = "";
+    // ======= Unirse =======
+    joinBtn.onclick = () => {
+      const username = usernameInput.value.trim();
+      if (!username) return;
+
+      socket.emit("join", username);
+      usernameInput.style.display = "none";
+      joinBtn.style.display = "none";
+      chatArea.style.display = "block";
     };
 
-    socket.on("chat message", (msg) => {
+    // ======= Enviar mensaje =======
+    sendBtn.onclick = () => {
+      const msg = messageInput.value.trim();
+      if (!msg) return;
+
+      socket.emit("chat message", msg);
+      messageInput.value = "";
+    };
+
+    // ======= Recibir mensaje =======
+    socket.on("chat message", (data) => {
       const div = document.createElement("div");
-      div.innerHTML = msg;
+      div.classList.add("message");
+
+      div.innerHTML =
+        `<span class="username">${data.username}</span>` +
+        `<span class="time">(${data.time})</span>: ` +
+        data.message;
+
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    });
+
+    // ======= Mensajes sistema =======
+    socket.on("system message", (msg) => {
+      const div = document.createElement("div");
+      div.classList.add("message", "system");
+      div.innerText = msg;
       messages.appendChild(div);
     });
 
-    // Enviar archivo
-    document.getElementById("sendFile").onclick = async () => {
-      const fileInput = document.getElementById("fileInput");
+    // ======= Enviar archivo =======
+    sendFileBtn.onclick = async () => {
       const file = fileInput.files[0];
-
       if (!file) return;
 
       const formData = new FormData();
@@ -56,7 +131,10 @@
         "chat message",
         `<a href="${data.fileUrl}" target="_blank">${data.originalName}</a>`
       );
+
+      fileInput.value = "";
     };
   </script>
+
 </body>
 </html>
