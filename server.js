@@ -11,69 +11,46 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// ======= Crear carpeta uploads si no existe =======
+// Crear carpeta uploads si no existe
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 
-// ======= Configuración de subida =======
+// Middleware estático
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(express.static(path.join(__dirname, "public")));
+
+// FORZAR envío de index.html
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// Configuración Multer
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "uploads/");
   },
   filename: function (req, file, cb) {
-    const uniqueName =
-      Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueName + path.extname(file.originalname));
+    cb(null, Date.now() + "-" + file.originalname);
   }
 });
 
 const upload = multer({ storage });
 
-// ======= Middleware =======
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static("uploads"));
-app.use(express.json());
-
-// ======= Ruta subida archivos =======
 app.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
-
   res.json({
     fileUrl: "/uploads/" + req.file.filename,
     originalName: req.file.originalname
   });
 });
 
-// ======= Socket.IO =======
+// Socket
 io.on("connection", (socket) => {
-  console.log("Usuario conectado:", socket.id);
-
-  socket.on("join", (username) => {
-    socket.username = username;
-    io.emit("system message", `${username} se ha unido al chat`);
-  });
-
   socket.on("chat message", (data) => {
-    const messageData = {
-      username: socket.username || "Anónimo",
-      message: data,
-      time: new Date().toLocaleTimeString()
-    };
-
-    io.emit("chat message", messageData);
-  });
-
-  socket.on("disconnect", () => {
-    if (socket.username) {
-      io.emit("system message", `${socket.username} salió del chat`);
-    }
+    io.emit("chat message", data);
   });
 });
 
-// ======= Iniciar servidor =======
 server.listen(PORT, () => {
-  console.log("Servidor corriendo en puerto " + PORT);
+  console.log("Servidor iniciado en puerto " + PORT);
 });
