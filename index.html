@@ -1,180 +1,62 @@
-}<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Nexus</title>
-
-<style>
-:root {
-  --primary: #00ffff;
-  --bg: #0a0a0a;
-  --panel: #111;
-  --text: #ffffff;
-}
-
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-/* Sidebar */
-.sidebar {
-  width: 80px;
-  background: var(--panel);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 20px;
-}
-
-.logo {
-  font-size: 32px;
-  font-weight: bold;
-  color: var(--primary);
-  text-shadow:
-    0 0 5px var(--primary),
-    0 0 15px var(--primary);
-  margin-bottom: 30px;
-}
-
-/* Channels */
-.channels {
-  width: 200px;
-  background: #151515;
-  padding: 20px;
-}
-
-.channel {
-  margin-bottom: 15px;
-  cursor: pointer;
-  color: #aaa;
-  transition: 0.3s;
-}
-
-.channel:hover {
-  color: var(--primary);
-}
-
-/* Chat */
-.chat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.messages {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-}
-
-.message {
-  margin-bottom: 10px;
-  padding: 8px 12px;
-  background: #1a1a1a;
-  border-left: 3px solid var(--primary);
-  border-radius: 4px;
-}
-
-.input-area {
-  display: flex;
-  padding: 15px;
-  background: #151515;
-}
-
-input {
-  flex: 1;
-  padding: 10px;
-  background: #222;
-  border: none;
-  color: white;
-  outline: none;
-}
-
-button {
-  background: var(--primary);
-  border: none;
-  padding: 10px 20px;
-  cursor: pointer;
-  margin-left: 10px;
-  font-weight: bold;
-}
-
-button:hover {
-  opacity: 0.8;
-}
-</style>
+  <title>Nexus Chat</title>
 </head>
-
 <body>
+  <h1>Nexus Chat</h1>
 
-<div class="sidebar">
-  <div class="logo">N</div>
-</div>
+  <div id="messages"></div>
 
-<div class="channels">
-  <div class="channel"># general</div>
-  <div class="channel"># juegos</div>
-  <div class="channel"># programación</div>
-</div>
+  <input id="input" placeholder="Escribe un mensaje..." />
+  <button id="send">Enviar</button>
 
-<div class="chat">
-  <div class="messages" id="messages"></div>
-  <div class="input-area">
-    <input id="messageInput" placeholder="Escribe en Nexus..." autocomplete="off">
-    <button onclick="sendMessage()">Enviar</button>
-  </div>
-</div>
+  <br><br>
 
-<script src="/socket.io/socket.io.js"></script>
+  <input type="file" id="fileInput">
+  <button id="sendFile">Enviar Archivo</button>
 
-<script>
-const socket = io();
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
 
-let username = localStorage.getItem("nexus_username");
+    const input = document.getElementById("input");
+    const sendBtn = document.getElementById("send");
+    const messages = document.getElementById("messages");
 
-if (!username) {
-  username = prompt("Elige tu nombre en Nexus:");
-  if (!username || username.trim() === "") {
-    username = "Usuario" + Math.floor(Math.random() * 1000);
-  }
-  localStorage.setItem("nexus_username", username);
-}
+    sendBtn.onclick = () => {
+      socket.emit("chat message", input.value);
+      input.value = "";
+    };
 
-function sendMessage() {
-  const input = document.getElementById("messageInput");
-
-  if (input.value.trim() !== "") {
-    socket.emit("chat message", {
-      user: username,
-      text: input.value
+    socket.on("chat message", (msg) => {
+      const div = document.createElement("div");
+      div.innerHTML = msg;
+      messages.appendChild(div);
     });
-    input.value = "";
-  }
-}
 
-socket.on("chat message", function(data) {
-  const messages = document.getElementById("messages");
+    // Enviar archivo
+    document.getElementById("sendFile").onclick = async () => {
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
 
-  const div = document.createElement("div");
-  div.classList.add("message");
-  div.innerHTML = "<strong>" + data.user + ":</strong> " + data.text;
+      if (!file) return;
 
-  messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight;
-});
+      const formData = new FormData();
+      formData.append("file", file);
 
-document.getElementById("messageInput").addEventListener("keypress", function(e) {
-  if (e.key === "Enter") {
-    sendMessage();
-  }
-});
-</script>
+      const res = await fetch("/upload", {
+        method: "POST",
+        body: formData
+      });
 
+      const data = await res.json();
+
+      socket.emit(
+        "chat message",
+        `<a href="${data.fileUrl}" target="_blank">${data.originalName}</a>`
+      );
+    };
+  </script>
 </body>
 </html>

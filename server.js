@@ -2,53 +2,46 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
+const multer = require("multer");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Servir archivos estáticos
-app.use(express.static(path.join(__dirname)));
+const PORT = process.env.PORT || 3000;
 
-// Sistema básico anti-spam simple
-const messageCooldown = new Map();
+// Configuración de subida de archivos
+const upload = multer({
+  dest: "uploads/"
+});
 
-io.on("connection", (socket) => {
-  console.log("Usuario conectado:", socket.id);
+// Servir carpeta pública
+app.use(express.static(path.join(__dirname, "public")));
 
-  socket.on("chat message", (data) => {
-    const now = Date.now();
-    const lastMessage = messageCooldown.get(socket.id) || 0;
+// Servir archivos subidos
+app.use("/uploads", express.static("uploads"));
 
-    // Cooldown de 500ms para evitar spam
-    if (now - lastMessage < 500) return;
-
-    messageCooldown.set(socket.id, now);
-
-    // Validar datos
-    if (
-      typeof data !== "object" ||
-      typeof data.user !== "string" ||
-      typeof data.text !== "string"
-    ) return;
-
-    if (data.text.length > 500) return; // Limitar tamaño
-
-    io.emit("chat message", {
-      user: data.user.substring(0, 20),
-      text: data.text.substring(0, 500)
-    });
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Usuario desconectado:", socket.id);
-    messageCooldown.delete(socket.id);
+// Ruta para subir archivos
+app.post("/upload", upload.single("file"), (req, res) => {
+  res.json({
+    fileUrl: "/uploads/" + req.file.filename,
+    originalName: req.file.originalname
   });
 });
 
-// PUERTO DINÁMICO PARA RENDER
-const PORT = process.env.PORT || 3000;
+// Socket.io
+io.on("connection", (socket) => {
+  console.log("Usuario conectado");
+
+  socket.on("chat message", (msg) => {
+    io.emit("chat message", msg);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Usuario desconectado");
+  });
+});
 
 server.listen(PORT, () => {
-  console.log("Nexus corriendo en puerto " + PORT);
+  console.log("Servidor corriendo en puerto " + PORT);
 });
